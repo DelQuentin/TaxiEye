@@ -1,43 +1,37 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import cv2,datetime
+import cv2
 
-def segmentation(img,viewLimit,debug):
-    if debug: print("\n ===== Segmentation =====")
-    if debug: print(str(datetime.datetime.now())," - Process Start")
-    scale = 10
+def segmentation(img,cam_set,sc,win):
+    scale = sc # pixels per meter in the top to bottom image
 
     # ========== HOMOGRAPHIC TRANSFORM ==========
     # extract lower part of image below horizon
     h,w,c = np.shape(img)
-    src = np.array([[0,viewLimit],[w,viewLimit],[w,h],[0,h]],np.float32)
+    src = np.array([[0,cam_set["top_limit"]],[w,cam_set["top_limit"]],[w,cam_set["bot_limit"]],[0,cam_set["bot_limit"]]],np.float32)
 
     # Data to caraterise field of view
-    latFar = 49
-    latNear = 1.67
+    latFar = cam_set["far_half_width"]
+    latNear = cam_set["near_half_width"]
     delta = w/2*latNear/latFar
 
     # Transformation
     dst = np.float32([[0,0], [w,0], [w/2+delta,h], [w/2-delta,h]]) 
     matrix = cv2.getPerspectiveTransform(src, dst)
     transformed_img = cv2.warpPerspective(img, matrix, (w,h))
-    # cv2.imshow("After Homographic Transform",transformed_img)
 
     # resize to real scale
-    real_w = 98
-    real_d = 60
+    real_w = int(2*latFar)
+    real_d = cam_set['depth']
     img = cv2.resize(transformed_img,[scale*real_w,scale*real_d])
-    if debug: print(str(datetime.datetime.now())," - Transformation Successful")
 
     # ========== SLIDING WINDOW ==========
-    # ===== Init Params & Vars =====
-    winHalfSize = [scale*3,scale*1]
+    # ======== Init Params & Vars ========
+    winHalfSize = [int(win[0]*scale),int(win[1]*scale)]
     lines = [[True,[int(scale*real_w//2),int(scale*real_d + winHalfSize[1])]]]
-    if debug:
-        seg_debug = np.zeros([scale*real_d,scale*real_w,3],dtype=np.uint8)
-        seg_debug = cv2.addWeighted(seg_debug,1.0,img,0.3,0.0)
-        colors = [(255,0,0),(0,255,0),(0,0,255),(255,0,255),(255,255,0),(0,255,255)]
-        seg_debug_alpha = np.zeros([scale*real_d,scale*real_w,3],dtype=np.uint8)
+    seg_image = np.zeros([scale*real_d,scale*real_w,3],dtype=np.uint8)
+    seg_image = cv2.addWeighted(seg_image,1.0,img,0.3,0.0)
+    colors = [(255,0,0),(0,255,0),(0,0,255),(255,0,255),(255,255,0),(0,255,255)]
+    seg_image_alpha = np.zeros([scale*real_d,scale*real_w,3],dtype=np.uint8)
 
     # ===== Process =====
     run = True
@@ -57,8 +51,6 @@ def segmentation(img,viewLimit,debug):
                 if next_point[1] > 3*winHalfSize[1] and next_point[0] > winHalfSize[0] and next_point[0] < winHalfSize[0] + scale*real_w: # If point allows a window in the image
                     # Sliding Window Generation
                     sw = img[ next_point[1]-winHalfSize[1]:next_point[1]+winHalfSize[1] , next_point[0]-winHalfSize[0]:next_point[0]+winHalfSize[0] ]
-                    if debug:
-                        cv2.rectangle(seg_debug,(next_point[0]-winHalfSize[0], next_point[1]-winHalfSize[1]),(next_point[0]+winHalfSize[0], next_point[1]+winHalfSize[1]),(127,127,127),1)
                     # Extract Lines
                     sw_full = extractLines(sw)
                     # Create analyse horizontal data
@@ -79,8 +71,6 @@ def segmentation(img,viewLimit,debug):
                     line[0] == False
          
         # =============== Dots Further Treatment ===============
-        # print("line_to_process:{}".format(line_to_process))
-        # print("dots_to_process:{}".format(dots_to_process))
         if len(dots_to_process) == 0 or len(line_to_process) == 0:
             break
         # ========== Kernel Based Clusterisation ==========
@@ -99,13 +89,9 @@ def segmentation(img,viewLimit,debug):
         for dot in dots_to_process:
             for k in range(len(kernel_x)):
                 kernel_y[k] = max(kernel_y[k],gain*np.exp(-0.5*((kernel_x[k]-dot[0])/sig)**2))
-        # plt.figure()
-        # plt.plot(kernel_x,kernel_y)
-        # plt.show()
         # ===== From Kernel to Dots =====
         dtl_clusters = clusterize2(kernel_x,kernel_y,max(kernel_y)*0.5)
         dtl_dots = clusters2dots(dtl_clusters,0)
-        # print("dtl_dots:{}".format(dtl_dots))
         # ===== Assign Point to Line =====
         lines_dots = []
         for d in line_to_process:
@@ -119,7 +105,6 @@ def segmentation(img,viewLimit,debug):
                     min_l = l
                     min_d = d 
             lines_dots[min_l].append(dot)
-        # print("lines_dots:{}".format(lines_dots))
         # ========== Line Processing ==========
         ls = 0
         for lp in range(len(lines_dots)):
@@ -140,12 +125,11 @@ def segmentation(img,viewLimit,debug):
             # Go to next line
             ls+=1
     
-    # Display Segmentation Preliminary result
     for l in range(0,len(lines)):
-        cv2.circle(seg_debug_alpha,lines[l][1],2,colors[l%len(colors)],5)
+        cv2.circle(seg_image_alpha,lines[l][1],3,colors[l%len(colors)],4)
         for p in range(1,len(lines[l])-1):
-            cv2.line(seg_debug_alpha,lines[l][p],lines[l][p+1],colors[l%len(colors)],5)
-            cv2.circle(seg_debug_alpha,lines[l][p+1],2,colors[l%len(colors)],5)
+            cv2.line(seg_image_alpha,lines[l][p],lines[l][p+1],colors[l%len(colors)],4)
+            cv2.circle(seg_image_alpha,lines[l][p+1],3,colors[l%len(colors)],4)
 
     # ========== Line Post Processing ==========
     joints = []
@@ -174,28 +158,31 @@ def segmentation(img,viewLimit,debug):
                 for d in range(1,len(nl)):
                     line.append(nl[d])
         final_lines.append(line)
+    # ===== Take Only Immidiate Crossing =====
+    main_joint = final_lines[0][-1]
+    l = 1
+    while l<len(final_lines):
+        if final_lines[l][1] != main_joint:
+            final_lines.pop(l)
+        else:
+            l+=1
 
-    # ===== Display Lines (DEBUG) ===== 
-    if debug:
-        seg_debug = cv2.addWeighted(seg_debug,1.0,seg_debug_alpha,0.25,0.0)
-        for l in range(0,len(final_lines)):
-            cv2.circle(seg_debug,final_lines[l][1],1,colors[l%len(colors)],2)
-            for p in range(1,len(final_lines[l])-1):
-                cv2.line(seg_debug,final_lines[l][p],final_lines[l][p+1],colors[l%len(colors)],2)
-                cv2.circle(seg_debug,final_lines[l][p+1],1,colors[l%len(colors)],2)
-        cv2.imshow('Segmentation Debug',seg_debug)
-        # cv2.waitKey(0)
+    # ===== Display Lines ===== 
+    seg_image = cv2.addWeighted(seg_image,1.0,seg_image_alpha,0.3,0.0)
+    for l in range(0,len(final_lines)):
+        cv2.circle(seg_image,final_lines[l][1],1,colors[l%len(colors)],2)
+        for p in range(1,len(final_lines[l])-1):
+            cv2.line(seg_image,final_lines[l][p],final_lines[l][p+1],colors[l%len(colors)],2)
+            cv2.circle(seg_image,final_lines[l][p+1],1,colors[l%len(colors)],2)
 
     # ===== End Of Process =====
-    if debug: print(str(datetime.datetime.now())," - Process Successful")
-    return lines
+    return final_lines,seg_image
 
 # ==========================================================================================================================
 # ===================================================== TOOL FUNCTIONS =====================================================
 def extractLines(sw):
     # Change color space
     sw_hsv = cv2.cvtColor(sw,cv2.COLOR_RGB2HSV_FULL)
-    cv2.imshow("HSV",cv2.resize(sw_hsv,[600,200],interpolation=cv2.INTER_AREA))
     # Filter color
     sw_bin = cv2.inRange(sw_hsv,(120,100,75),(155,255,255))
     # Edge Detection

@@ -20,16 +20,16 @@ class Controller:
         time.sleep(0.2)
 
     def idle(self):
-        self.action("LEFT BARKE",-1)
-        self.action("RIGHT BARKE",-1)
-        self.action("THROTTLE",-1)
+        self.action("LEFT BARKE",0)
+        self.action("RIGHT BARKE",0)
+        self.action("THROTTLE",0)
         self.action("RUDDER",0)
     
     def initSim(self):
         self.action("CAMERA",0)
         time.sleep(0.1)
-        self.action("INFOBAR",0)
-        self.action("INFOBAR",0)
+        self.action("COORD",0)
+        time.sleep(0.1)
 
     def action(self,action,value):
         match action:
@@ -40,62 +40,22 @@ class Controller:
                 time.sleep(0.01)
 
             case "THROTTLE":
-                self.gp.left_joystick_float(x_value_float=self.memljX, y_value_float=value)
-                self.memljY = value
+                self.gp.left_joystick_float(x_value_float=self.memljX, y_value_float=-1+2*value)
+                self.memljY = -1+2*value
                 self.gp.update()
                 time.sleep(0.01)
 
             case "LEFT BARKE":
-                self.gp.right_joystick_float(x_value_float=self.memrjX, y_value_float=value)
-                self.memrjY = value
+                self.gp.right_joystick_float(x_value_float=self.memrjX, y_value_float=-1+2*value)
+                self.memrjY = -1+2*value
                 self.gp.update()
                 time.sleep(0.01)
 
             case "RIGHT BRAKE":
-                self.gp.right_joystick_float(x_value_float=value, y_value_float=self.memrjY)
-                self.memrjX = value
+                self.gp.right_joystick_float(x_value_float=-1+2*value, y_value_float=self.memrjY)
+                self.memrjX = -1+2*value
                 self.gp.update()
                 time.sleep(0.01)
-
-            case "RESTART":
-                self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_START)
-                self.gp.update()
-                time.sleep(0.2)
-                self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_START)
-                self.gp.update()
-                time.sleep(0.2)
-
-            case "ESC":
-                self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK)
-                self.gp.update()
-                time.sleep(0.2)
-                self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK)
-                self.gp.update()
-                time.sleep(0.2)
-
-            case "SIM SPEEED ACC":
-                self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_Y)
-                self.gp.update()
-                time.sleep(0.2)
-                self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_Y)
-                self.gp.update()
-                time.sleep(0.2)
-
-            case "SIM SPEEED DCC":
-                self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_X)
-                self.gp.update()
-                time.sleep(0.2)
-                self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_X)
-                self.gp.update()
-                time.sleep(0.2)
-
-            case "SIM SPEEED RESET":
-                self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_Y)
-                self.gp.update()
-                time.sleep(0.2)
-                self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_Y)
-                self.gp.update()
-                time.sleep(0.2)
             
             case "PARK":
                 self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT)
@@ -119,14 +79,14 @@ class Controller:
                 time.sleep(0.2)
                 self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP)
                 self.gp.update()
-                time.sleep(0.2)  
+                time.sleep(0.2)
 
-            case "INFOBAR":
+            case "COORD":
                 self.gp.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN)
                 self.gp.update()
                 time.sleep(0.2)
                 self.gp.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN)
                 self.gp.update()
-                time.sleep(0.2)  
+                time.sleep(0.2)
 
         self.gp.update()
