@@ -1,5 +1,5 @@
 from Map import Map
-from matching_func import matching,matching_with_hdg
+from matching_func import matching,matching_with_hdg_matrix,matching_with_hdg_sort,matching_with_hdg_sort_or_matrix
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -79,7 +79,7 @@ class Navigator:
         end_path = False
         curr_line_info,next_cross_info = self.map.situation_info(self.pos,self.dir)
         # Determine corrected position
-        corr_pos,end = self.project_on_map_line(self.pos,gps[0],gps[1])
+        corr_pos,end = self.project_on_map_line(self.pos,gps[0],gps[1]) 
         # Distance Data Analytics
         self.dist.append(seg_data[0][-1][1])
         if len(self.dist) > 2:
@@ -96,7 +96,7 @@ class Navigator:
                     end_path = True
         # ===== Vision Flag for line switch =====
         # Switch line if position flag is raised and no crossing is in sight
-        if self.pos_flag and (self.dist_deriv[-1] < 0 or len(seg_data) == 1 or self.dist[-1] <= 500 ):
+        if self.pos_flag and (self.dist_deriv[-1] < -100 or len(seg_data) == 1 or len(next_cross_info)<=1):
             switch_line = True
         
         if switch_line:
@@ -112,7 +112,7 @@ class Navigator:
             self.pos_flag = False
 
         # Generate matching and line to follow
-        labels,matching_score = matching_with_hdg(seg_data,curr_line_info,next_cross_info,hdg,False)
+        labels,matching_score = matching_with_hdg_sort_or_matrix(seg_data,curr_line_info,next_cross_info,hdg,True)
         self.matching.append(matching_score)
         line_to_follow = []
         if len(seg_data) > 1 :
@@ -147,10 +147,5 @@ class Navigator:
             end = 1
         return mid,end
             
-    def plot_data(self,blk):
-        fig, axs = plt.subplots(3)
-        fig.suptitle('Distance value and Derivative, and Matching Score')
-        axs[0].plot(self.dist)
-        axs[1].plot(self.dist_deriv)
-        axs[2].plot(self.matching)
-        plt.show(block=blk)
+    def get_data(self) -> list:
+        return self.matching, self.dist_deriv, self.dist

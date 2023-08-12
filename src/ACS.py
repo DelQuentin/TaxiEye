@@ -37,7 +37,7 @@ class ACS:
         self.throttle = min(max(throttle_command,0),1.0)
 
         # ===== BRAKES =====
-        brakes = -min((self.spd_tgt - spd),0)*0.1
+        brakes = min(-min((self.spd_tgt - spd),0)*0.1,1)
 
         # ===== RECORDING =====
         self.recording[0].append(deviation)
@@ -48,21 +48,22 @@ class ACS:
 
         return self.rudder, self.throttle, brakes
 
-    def display_recordings(self,blk):
-        fig,axs = plt.subplots(3)
-        axs[0].plot(self.recording[0])
-        axs[0].grid()
-        axs[0].legend(['Deviation'])
-        axs[0].set_title('Deviation from centerline')
-        axs[1].plot(self.recording[1])
-        axs[1].plot(self.recording[2])
-        axs[1].grid()
-        axs[1].legend(['Feedback','Rudder'])
-        axs[1].set_title('Deviation feedback and rudder command')
-        axs[2].plot(self.recording[3])
-        axs[2].plot(self.recording[4])
-        axs[2].grid()
-        axs[2].legend(['Throttle','Brakes'])
-        axs[2].set_title('Throttle and brakes commands')
-        fig.tight_layout()
-        plt.show(block=blk)
+    def get_data(self) -> list:
+        # fig,axs = plt.subplots(3)
+        # axs[0].plot(self.recording[0])
+        # axs[0].grid()
+        # axs[0].legend(['Deviation'])
+        # axs[0].set_title('Deviation from centerline')
+        # axs[1].plot(self.recording[1])
+        # axs[1].plot(self.recording[2])
+        # axs[1].grid()
+        # axs[1].legend(['Feedback','Rudder'])
+        # axs[1].set_title('Deviation feedback and rudder command')
+        # axs[2].plot(self.recording[3])
+        # axs[2].plot(self.recording[4])
+        # axs[2].grid()
+        # axs[2].legend(['Throttle','Brakes'])
+        # axs[2].set_title('Throttle and brakes commands')
+        # fig.tight_layout()
+        # plt.show()
+        return self.recording[0], self.recording[1], self.recording[2], self.recording[3], self.recording[4]

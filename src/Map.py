@@ -21,7 +21,7 @@ class Map:
     def cv2XY(self,x,y):
         return [self.X-x,self.Y-y]
     
-    def map_image(self):
+    def map_image(self,path):
         # Determine Dimensions in original scale (meters)
         map_w = self.bounds[3]-self.bounds[2]
         map_h = self.bounds[1]-self.bounds[0]
@@ -35,12 +35,14 @@ class Map:
         map_img = cv2.resize(map_img,[int(self.display_scale*map_w),int(self.display_scale*map_h)])
         # Draw Lines
         for name,dots in self.lines.items():
-            color = (0,200,255)
             x_s = int(self.display_scale*(self.bounds[3]-dots["Y_s"]))
             y_s = int(self.display_scale*(dots["X_s"]-self.bounds[0]))
             x_e = int(self.display_scale*(self.bounds[3]-dots["Y_e"]))
             y_e = int(self.display_scale*(dots["X_e"]-self.bounds[0]))
-            cv2.line(map_img,[x_s,y_s],[x_e,y_e],color,1)
+            if name in path:
+                cv2.line(map_img,[x_s,y_s],[x_e,y_e],(0,0,255),1)
+            else:
+                cv2.line(map_img,[x_s,y_s],[x_e,y_e],(0,200,255),1)
         # Display
         return map_img
     
@@ -84,7 +86,6 @@ class Map:
             return False
 
 if __name__ == "__main__":
-    creech = Map('Creech',["P2","A2_P2_3","A3","A3_P3_1","A4","A4_F1_2","F1"])
-    init_pos = "C3"
-    curr_line_info,next_cross_info = creech.situation_info(init_pos,0)
+    creech = Map('Creech')
+    cv2.imshow("Map",creech.map_image([]))
     cv2.waitKey(0)

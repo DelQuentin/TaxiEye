@@ -1,0 +1,25 @@
+{
+    "map": "Creech",
+    "nb_samples":1,
+    "cam": {
+        "top_limit": 120,
+        "bot_limit": 1050,
+        "depth": 53,
+        "near_half_width": 3.5,
+        "far_half_width": 21
+    },
+    "data": {
+        "1.png":{
+            "pos": "P2",
+            "dir": -1,
+            "hdg": 2,
+            "seg": {
+                "0-0-0": "None",
+                "255-0-0": "P2",
+                "0-255-0": "A2_P2_3",
+                "0-0-255": "A2_P2_2",
+                "255-255-0": "A2_P2_1"
+            }
+        }
+    }
+}

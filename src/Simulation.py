@@ -1,10 +1,11 @@
 # =============== Libraries Import ===============
-import winsound, time, cv2, random, os
+import os
+import winsound, time, cv2, random, csv
 import numpy as np
 from PIL import ImageGrab
 
 # ================= Files Import =================
-from segmentation_func import segmentation
+from segmentation_func import segmentation,segmentationv2,seg_dbscan
 from Controller import Controller
 from Navigator import Navigator
 from Avionics import Avionics
@@ -15,11 +16,13 @@ from Map import Map
 class Simulation:
     """Simulation Class which oversees the process of simulation of the Taxiway Navigation System with simulators, and especially coded here for Digital Combat Simulator® by Eagle Dynamics."""
 
-    def __init__(self, simulator: str ,source: str, map_name: str, path: list, camera_settings: list, spd_tgt: int, rudder_pid: list, deviation_feedback_params: list, seg_scale: int, slid_win: list) -> None:
+    def __init__(self, system: str, simulator: str ,source: str, map_name: str, path: list, camera_settings: list, spd_tgt: int, rudder_pid: list, deviation_feedback_params: list, seg_scale: int, slid_win: list) -> None:
         """Simulation Class constructor
 
         ----------
             Parameters
+        system : str 
+            -> Indicates which system model will be used to make the Taxiway Navigation System.
         simulator : str 
             -> Indicates which flight simulator will be used as image source and simulation engine.
         source: str 
@@ -39,6 +42,7 @@ class Simulation:
         """
 
         # Simulation Parameters
+        self.system = system
         self.sim = simulator
         self.src = source
         self.path = path
@@ -46,6 +50,10 @@ class Simulation:
         self.step = 0
         self.seg_scale = seg_scale
         self.slid_win = slid_win
+        # Data Recording
+        self.compute_time = []
+        self.nb_line = []
+        self.nb_points = []
 
         # Video Source Initialisation
         if self.src == 'Realtime':
@@ -66,7 +74,7 @@ class Simulation:
         self.acs = ACS(spd_tgt,rudder_pid,deviation_feedback_params)
         self.avi = Avionics()
         self.map = Map(map_name)
-        self.map_img = self.map.map_image()
+        self.map_img = self.map.map_image(path)
         self.nav = Navigator(path[0],0,self.path,self.map)
     
     def run(self,debug: bool):
@@ -98,6 +106,8 @@ class Simulation:
                 return end_flag
         
         # ===== Run Systems =====
+        # Computation Start
+        time_stamp_begin = time.time()
         # Run Avionics
         hdg,spd,pos_x,pos_y = self.avi.extract(camera_feed)
         if debug: print("hdg:{} spd:{} X:{} Y:{}".format(hdg,spd,pos_x,pos_y))
@@ -108,9 +118,14 @@ class Simulation:
         if debug: print("GPS: {} - {}".format(gps[0],gps[1]))
 
         # Run Taxiway Navigation System
-        seg_data,dbg_image = segmentation(camera_feed,self.cam,self.seg_scale,self.slid_win)
+        if self.system == 'SW':
+            seg_data,dbg_image,nb_points = segmentationv2(camera_feed,self.cam,self.seg_scale,self.slid_win)
+        elif self.system == 'DBSCAN':
+            seg_data,dbg_image = seg_dbscan(camera_feed,self.cam,self.seg_scale)
+        if debug: print("Segmentation Successful")
         center = np.shape(dbg_image)[1]/2
         labels,line_to_follow,pos_corr,end_flag = self.nav.run_with_avionics(seg_data,gps,hdg) # A version without avionics exists in case the avionics system is not availbale (not using DCS, or disbling it on purpose)
+        if debug: print("Matching and Navigation Successful")
 
         # Run Aircraft Control System
         rudder, throttle, brakes = self.acs.run(line_to_follow,center,spd)
@@ -120,15 +135,31 @@ class Simulation:
         if self.src == 'Realtime':
             if end_flag:
                 self.ctr.idle()
+                self.ctr.action("LEFT BARKE",1)
+                self.ctr.action("RIGHT BARKE",1)
             else:
                 self.ctr.action("THROTTLE",throttle)
                 self.ctr.action("RUDDER",rudder)
-                self.ctr.action("",brakes)
+
+        # Computation End 
+        time_stamp_end = time.time()
+        self.nb_line.append(len(seg_data))
+        self.nb_points.append(nb_points)
+        self.compute_time.append((time_stamp_end-time_stamp_begin)*1000) # in ms
 
         # ===== Debug Windows =====
         if debug:
+            
+            # === Map Data ===
+            map_img_step = self.map_img.copy()
+            map_img_step = self.map.point_on_image(map_img_step,gps[0],gps[1],2,(0,0,255),2)
+            map_img_step = self.map.point_on_image(map_img_step,pos_corr[0],pos_corr[1],1,(0,255,0),2)
+            cv2.imshow("System Map Data",map_img_step)
+            # cv2.imwrite(''.join([os.getcwd(),'/exports/map-',str(self.step),'.png']),map_img_step)
+
             # === Camera Feed ===
             cv2.imshow('Camera Feed',cv2.resize(camera_feed,(640,360)))
+
             # === Vision Data ===
             # Display Labels of the matching
             for l in range(len(seg_data)):
@@ -159,13 +190,6 @@ class Simulation:
             cv2.imshow("System Image Data",dbg_image)
             # cv2.imwrite(''.join([os.getcwd(),'/exports/camera-',str(self.step),'.png']),dbg_image)
 
-            # === Map Data ===
-            # map_img_step = self.map_img.copy()
-            # map_img_step = self.map.point_on_image(map_img_step,gps[0],gps[1],2,(0,0,255),2)
-            # map_img_step = self.map.point_on_image(map_img_step,pos_corr[0],pos_corr[1],2,(255,0,0),2)
-            # cv2.imshow("System Map Data",map_img_step)
-            # cv2.imwrite(''.join([os.getcwd(),'/exports/map-',str(self.step),'.png']),map_img_step)
-            cv2.waitKey(0)
 
         # ===== End =====
         cv2.waitKey(1)
@@ -173,4 +197,39 @@ class Simulation:
         return end_flag
 
     def plot_data(self):
-        self.acs.display_recordings(True)
+        file_name = 'exports/TaxiEye_Export_'+time.strftime("%Y%m%d",time.gmtime())+'_'+self.map.map_name+'_'+self.path[0]+'_'+self.path[-1]+'.csv'
+        print("Exporting data : ",file_name)
+        matching, dist_deriv, dist = self.nav.get_data()
+        deviation, deviation_feed, rudder, throttle, brakes = self.acs.get_data()
+        # Write file
+        with open(file_name, 'w', newline='') as file:
+            writer = csv.writer(file)
+            heading = ["Step", 
+                       "Deviation", 
+                       "Deviation Feedback", 
+                       "Distance", 
+                       "Distance_Deriv",
+                       "Runtime", 
+                       "Nb Line", 
+                       "Nb Points", 
+                       "Matching",
+                       "Rudder",
+                       "Throttle",
+                       "Brakes",
+                       ]
+            writer.writerow(heading)
+            for step in range(self.step):
+                writer.writerow([step,
+                                 deviation[step]/self.seg_scale,
+                                 deviation_feed[step]/self.seg_scale,
+                                 dist[step]/self.seg_scale,
+                                 dist_deriv[step]/self.seg_scale,
+                                 self.compute_time[step],
+                                 self.nb_line[step],
+                                 self.nb_points[step],
+                                 matching[step],
+                                 rudder[step],
+                                 throttle[step],
+                                 brakes[step]
+                                 ])
+        print("Done")
