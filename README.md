@@ -12,7 +12,7 @@ But it however requires modifying the parameter in the file called to the desire
 - Recording or Realtime
 - Path and Map
 - PID parameters
-- Deviation feedback profile using guassian parameters (μ,σ)
+- Deviation feedback profile using gaussian parameters (μ,σ)
 
 ## Run evaluations
 The command to use the evaluation file has the following format :
