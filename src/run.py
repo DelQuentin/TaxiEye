@@ -33,7 +33,7 @@ if __name__ == '__main__':
     model = 'SW'  #'DBSCAN'                                         # System model will be used to make the Taxiway Navigation System choices
     sim = 'DCS'                                                     # Flight simulator that will be used as image source and simulation engine
     mode = 'Realtime'    #'Realtime'                               # Using a recording ('Recording') or real-time data (using 'Realtime')
-    uc = "Creech_P5_H3_N_C5"
+    uc = "Creech_P2_F1"
     map = UC[uc][0]                                                 # Map name of where the simulation will take place
     path = UC[uc][1]                                                # Path on the taxiway that should be followed (has to be consistent with flight simulator set up or recording)
     if mode == 'Recording': src = UC[uc][2] 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     deviation_feedback_params = [40,50]                             # Parameters of the guaussian distribution used to extimate the deviation with a look ahead perspective
     debug = True                                                    # Debug information toggle
     seg_scale = 10                                                  # Pixels per meter in the homographic transform used for segmentation purposes
-    slid_win = [3,0.5]                                              # Dimensions of the sliding window in the segmentation process [left<->right,up<->down] in meters
+    slid_win = [2.5,1]                                              # Dimensions of the sliding window in the segmentation process [left<->right,up<->down] in meters
 
     # ===== Simulation Handling =====
     sim = Simulation(model,sim,src,map,path,cam,spd_tgt,rudder_pid,deviation_feedback_params,seg_scale,slid_win)

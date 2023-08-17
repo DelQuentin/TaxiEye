@@ -12,20 +12,20 @@ nb_files = len(files)
 t = 0
 
 # ===== PARAMETERS ===== (Adjust accodingly to system testing)
-# cam_set = {
-#     "top_limit": 140,                                           # Assumed level of end of vision on the ground, just under vanishing line (in pixels)
-#     "bot_limit": 1050,                                          # Assumed level of begin of vision on the ground (just over the telemetry stripe in DCS) (in pixels)
-#     "depth": 60,                                                # Distance in meters between the aircraft and the end of vision on the ground (in meters)
-#     "near_half_width": 1.75,                                    # Distance between center of vision and lateral view limit at level of begin of vision on the ground (in meters)
-#     "far_half_width": 55.75,                                    # Distance between center of vision and lateral view limit at level of end of vision on the ground (in meters)
-# }
 cam_set = {
-    "top_limit": 120,
-        "bot_limit": 1050,
-        "depth": 53,
-        "near_half_width": 3.5,
-        "far_half_width": 21,
+    "top_limit": 140,                                           # Assumed level of end of vision on the ground, just under vanishing line (in pixels)
+    "bot_limit": 1050,                                          # Assumed level of begin of vision on the ground (just over the telemetry stripe in DCS) (in pixels)
+    "depth": 60,                                                # Distance in meters between the aircraft and the end of vision on the ground (in meters)
+    "near_half_width": 1.75,                                    # Distance between center of vision and lateral view limit at level of begin of vision on the ground (in meters)
+    "far_half_width": 55.75,                                    # Distance between center of vision and lateral view limit at level of end of vision on the ground (in meters)
 }
+# cam_set = {
+#     "top_limit": 120,
+#         "bot_limit": 1050,
+#         "depth": 53,
+#         "near_half_width": 3.5,
+#         "far_half_width": 21,
+# }
 scale = 10 # pixels per meter in the top to bottom image
 
 # ========== HOMOGRAPHIC TRANSFORM FOR DATASET IMAGES ==========

@@ -4,8 +4,7 @@ import matplotlib
 import numpy as np
 import cv2, sys, os, json
 import matplotlib as mpl
-from sklearn.metrics import confusion_matrix
-from mlxtend.plotting import plot_confusion_matrix
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
 # ================= Files Import =================
@@ -75,7 +74,7 @@ for file in files:
         seg_data,dbg_image = seg_dbscan(img,cam,scale)
 
     # ===== EVALUATION : LINES EXTRACTION FULL ===== Acc:0.9934122490911965  Pre:0.9311855366206824  Rec:0.648751282373315  F1:0.750377363323965  IoU:0.6219204661979955
-    if eval_method == 'extraction_full':
+    if eval_method == 'extraction':
         # Overall Taxi Lines Extraction Analysis (Using Shapes, to be redone using only point checks)
         seg_img = np.zeros(np.shape(dbg_image))
         # Add lines for label comparison on image
@@ -113,7 +112,7 @@ for file in files:
 
 
     # ===== EVALUATION : LINE SEGMENTATION FULL ===== Acc:0.9984161371898215  Pre:0.5169393853703411  Rec:0.5432400652527388  F1:0.5162362699249281  IoU:0.4448578333541108
-    elif eval_method == 'segmentation_full':
+    elif eval_method == 'segmentation':
         # Match Classes
         line_color = []
         for line in seg_data:
@@ -236,8 +235,8 @@ for file in files:
         # plt.show()
         cv2.waitKey(0)
     
-    # ===== EVALUATION : POINT & LINE MATCHING ===== Acc:0.8729946253826794  Pre:0.45465057474345394  Rec:0.45444293396028773  F1:0.4540870667252219  IoU:0.44628845685844215
-    if eval_method == 'matching_full':
+    # ===== EVALUATION : POINT MATCHING ===== Acc:0.8729946253826794  Pre:0.45465057474345394  Rec:0.45444293396028773  F1:0.4540870667252219  IoU:0.44628845685844215
+    if eval_method == 'matching':
         # ===== Generate Matching =====
         ds_map = Map(ds_info["map"])
         file_info = ds_info["data"][file]
@@ -265,11 +264,11 @@ for file in files:
                     color_code = "-".join([str(col) for col in img_gt_ht[point[1],point[0]]])
                     point_label = file_info["seg"][color_code]
                     if point_label == line_label:
-                        dbg_image = cv2.putText(dbg_image,line_label,(point[0],point[1]),cv2.FONT_HERSHEY_SIMPLEX,0.4,(50,255,50),1,2)
+                        dbg_image = cv2.putText(dbg_image,line_label,(point[0],point[1]),cv2.FONT_HERSHEY_SIMPLEX,0.6,(50,255,50),2,2)
                         cor_points += 1
                         m_classes[line_label]["TP"] += 1
                     else:
-                        dbg_image = cv2.putText(dbg_image,line_label+"/"+point_label,(point[0],point[1]),cv2.FONT_HERSHEY_SIMPLEX,0.4,(50,50,255),1,2)
+                        dbg_image = cv2.putText(dbg_image,line_label+"/"+point_label,(point[0],point[1]),cv2.FONT_HERSHEY_SIMPLEX,0.6,(50,50,255),2,2)
                         mis_points += 1
                         m_classes[line_label]["FP"] += 1
                         m_classes[point_label]["FN"] += 1
@@ -327,13 +326,116 @@ for file in files:
         IoU.append(m_IoU)
         # Visualise
         cv2.imshow('DEBUG',dbg_image)
-        cv2.waitKey(1)
+        cv2.waitKey(0)
 
+    # ===== EVALUATION : LINE TO FOLLOW USING POINTS ===== Only Confusion Matrix
+    if eval_method == 'follow_points': 
+        # ===== Generate Matching =====
+        ds_map = Map(ds_info["map"])
+        file_info = ds_info["data"][file]
+        path = file_info["follow"]
+        curr_line_info,next_cross_info = ds_map.situation_info(file_info["pos"],file_info["dir"])
+        labels,matching_score = matching_with_hdg_sort_or_matrix(seg_data,curr_line_info,next_cross_info,file_info["hdg"],False)
+        # Generating the line to follow in the same way the navigator do, but with the position estimation process
+        line_to_follow = []
+        if len(seg_data) > 1 :
+            for l in range(len(labels)):
+                if labels[l] in path:
+                    line_to_follow.extend(seg_data[l][1:])
+        else:
+            line_to_follow = seg_data[0][1:]
+
+        # ========== POINT MATCHING ==========
+        true = []
+        pred = []
+        for l in range(len(seg_data)):
+            line_label = labels[l]
+            if line_label == False: # If segmentation failed on the line, evaluation will count it as segmented as 'None' = no line
+                line_label = 'None'
+            for point in seg_data[l][1:]:
+                if point[1] <= len(img_gt_ht):
+                    # True
+                    color_code = "-".join([str(col) for col in img_gt_ht[point[1],point[0]]])
+                    point_label_gt = file_info["seg"][color_code]
+                    if point_label_gt == "None":
+                        X_true.append("None")
+                    elif point_label_gt in path:
+                        X_true.append("Line to Follow")
+                    else:
+                        X_true.append("Other lines")
+                    # Prediction
+                    if line_label == "None":
+                        X_pred.append("None")
+                    elif point in line_to_follow:
+                        X_pred.append("Line to Follow")
+                    else:
+                        X_pred.append("Other lines")
+        
+    # ===== EVALUATION : LINE TO FOLLOW USING LINES ===== Only Confusion Matrix
+    if eval_method == 'follow_lines': 
+        # ===== Generate Matching =====
+        ds_map = Map(ds_info["map"])
+        file_info = ds_info["data"][file]
+        path = file_info["follow"]
+        curr_line_info,next_cross_info = ds_map.situation_info(file_info["pos"],file_info["dir"])
+        labels,matching_score = matching_with_hdg_sort_or_matrix(seg_data,curr_line_info,next_cross_info,file_info["hdg"],False)
+        # Generating the line to follow in the same way the navigator do, but with the position estimation process
+        line_to_follow = []
+        if len(seg_data) > 1 :
+            for l in range(len(labels)):
+                if labels[l] in path:
+                    line_to_follow.extend(seg_data[l][1:])
+        else:
+            line_to_follow = seg_data[0][1:]
+
+        # Mask of all deteted lines
+        img_all_lines = np.zeros(np.shape(dbg_image))
+        for l in range(0,len(seg_data)):
+            for p in range(1,len(seg_data[l])-1):
+                cv2.line(img_all_lines,seg_data[l][p],seg_data[l][p+1],(255,255,255),8)
+
+        # Mask of all deteted lines to follow
+        img_lines_to_follow = np.zeros(np.shape(dbg_image))
+        for l in range(0,len(line_to_follow)-1):
+                cv2.line(img_lines_to_follow,line_to_follow[l],line_to_follow[l+1],(255,255,255),8)
+
+        for i in range(np.shape(dbg_image)[0]):
+            for j in range(np.shape(dbg_image)[1]):
+                if mask[i,j] > 0:
+                    color_code_gt = "-".join([str(int(col)) for col in img_gt_ht[i,j]])
+                    gt_label = file_info["seg"][color_code_gt]
+                    color_code_all_lines = "-".join([str(int(col)) for col in img_all_lines[i,j]])
+                    color_code_lines_to_follow = "-".join([str(int(col)) for col in img_lines_to_follow[i,j]])
+                    # True
+                    if gt_label in path:
+                        X_true.append("Line to follow")
+                    elif gt_label != 'None':
+                        X_true.append("Other lines")
+                    else:
+                        X_true.append("None")
+
+                    # Pred
+                    if color_code_lines_to_follow != '0-0-0':
+                        X_pred.append("Line to follow")
+                    elif color_code_all_lines != '0-0-0':
+                        X_pred.append("Other lines")
+                    else:
+                        X_pred.append("None")
 # ===== RESULTS =====
 print("\n == FINAL RESULTS ==")
 # Extraction
-print(eval_method," - Acc:{}  Pre:{}  Rec:{}  F1:{}  IoU:{}".format(np.mean(Acc),np.mean(Pre),np.mean(Rec),np.mean(F1s),np.mean(IoU)))
-cm = confusion_matrix(X_true,X_pred)
-sum = np.sum(np.sum(cm))
-plot_confusion_matrix(100*(cm+1)/sum, cmap="viridis", norm_colormap=matplotlib.colors.LogNorm(), colorbar=True)
-plt.show()
+if eval_method in ['segmentation','extraction']:
+    print(eval_method," - Acc:{}  Pre:{}  Rec:{}  F1:{}  IoU:{}".format(np.mean(Acc),np.mean(Pre),np.mean(Rec),np.mean(F1s),np.mean(IoU)))
+
+if eval_method == 'matching' : 
+    plt.rcParams.update({'font.size': 8})
+    cmd = ConfusionMatrixDisplay.from_predictions(X_true,X_pred,cmap='viridis',normalize='true', xticks_rotation='vertical', values_format='.2f')
+    plt.show()
+
+if eval_method == 'follow_points' :
+    cmd = ConfusionMatrixDisplay.from_predictions(X_true,X_pred,cmap='viridis',normalize='true', xticks_rotation='vertical', values_format='.2f')
+    plt.show()
+
+if eval_method == 'follow_lines' :
+    cmd = ConfusionMatrixDisplay.from_predictions(X_true,X_pred,cmap='viridis',normalize='true', xticks_rotation='vertical', values_format='.2f')
+    plt.show()

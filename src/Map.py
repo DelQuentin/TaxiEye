@@ -12,11 +12,7 @@ class Map:
         self.X = map_data["X"]
         self.Y = map_data["Y"]
         self.bounds = map_data["Boundaries"]
-        self.am = self.makeAdjacencyMatrix(self.lines)
         self.display_scale = 1
-    
-    def makeAdjacencyMatrix(self,lines):
-        return []
 
     def cv2XY(self,x,y):
         return [self.X-x,self.Y-y]
